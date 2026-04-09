@@ -1,0 +1,44 @@
+version: '3.8'
+services:
+  airflow:
+    #image: apache/airflow:2.10.2-python3.9
+    build: .
+    container_name: airflow_light
+    user: "${AIRFLOW_UID:-1000}:0"
+    env_file:
+      - .env
+    environment:
+      - AIRFLOW__CORE__EXECUTOR=SequentialExecutor
+      - AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres:5432/airflow
+      - AIRFLOW__CORE__LOAD_EXAMPLES=False
+      - AIRFLOW__WEBSERVER__SECRET_KEY=secret_key_dev
+      - _AIRFLOW_WWW_USER_USERNAME=airflow
+      - _AIRFLOW_WWW_USER_PASSWORD=airflow
+      # GCP
+      - GOOGLE_APPLICATION_CREDENTIALS=/opt/airflow/keys/keys.json
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/logs:/opt/airflow/logs
+      - ./airflow/plugins:/opt/airflow/plugins
+      - ./keys:/opt/airflow/keys:ro
+    ports:
+      - "8080:8080"
+    command: >
+      bash -c "airflow db init &&
+      airflow users create --username airflow --password airflow --firstname Admin --lastname User --role Admin --email admin@example.com || true &&
+      airflow standalone"
+    depends_on:
+      - postgres
+
+  postgres:
+    image: postgres:13
+    container_name: airflow_db_light
+    environment:
+      - POSTGRES_USER=airflow
+      - POSTGRES_PASSWORD=airflow
+      - POSTGRES_DB=airflow
+    volumes:
+      - postgres_data_light:/var/lib/postgresql/data
+
+volumes:
+  postgres_data_light:
