@@ -2,6 +2,8 @@ from airflow import DAG
 from airflow.operators.python import PythonOperator
 from airflow.providers.google.cloud.hooks.gcs import GCSHook
 from airflow.providers.google.cloud.operators.bigquery import BigQueryCreateExternalTableOperator
+from airflow.providers.google.cloud.transfers.gcs_to_bigquery import GCSToBigQueryOperator
+from airflow.operators.bash import BashOperator
 from datetime import datetime, timedelta
 import urllib.request
 import json
@@ -72,6 +74,8 @@ def extract_from_api_to_gcs(**kwargs):
         )
         print(f"EXITO: {len(df)} registros subidos en Parquet a gs://{BUCKET_NAME}/{storage_path}")
 
+        return storage_path
+
     except Exception as e:
         print(f"ERROR en la extracción: {e}")
         raise
@@ -101,26 +105,39 @@ with DAG(
         provide_context=True
     )
 
-    task_create_external_table = BigQueryCreateExternalTableOperator(
-        task_id="create_external_table",
-        table_resource={
-            "tableReference": {
-                "projectId": PROJECT_ID,
-                "datasetId": DATASET_NAME,
-                "tableId": TABLE_NAME,
-            },
-            "externalDataConfiguration": {
-                "sourceFormat": "PARQUET",
-                "sourceUris": [f"gs://{BUCKET_NAME}/raw_parquet/*"],
-                "hivePartitioningOptions": {
-                    "mode": "AUTO",
-                    "sourceUriPrefix": f"gs://{BUCKET_NAME}/raw_parquet/",
-                    "requirePartitionFilter": False,
-                },
-                "autodetect": True,
-            },
+    task_load_to_bq = GCSToBigQueryOperator(
+        task_id="load_parquet_to_bq",
+        bucket=BUCKET_NAME,
+        source_objects=[
+            "{{ ti.xcom_pull(task_ids='extract_and_upload_parquet') }}"
+        ],
+        destination_project_dataset_table=f"{PROJECT_ID}.polymarket_staging.markets",
+        source_format="PARQUET",
+        write_disposition="WRITE_APPEND",
+        create_disposition="CREATE_IF_NEEDED",
+        autodetect=True,
+        time_partitioning={
+            "type": "DAY",
+            "field": "extraction_timestamp"
         },
+        cluster_fields=["slug"],
         gcp_conn_id="google_cloud_default",
     )
 
-    task_extract >> task_create_external_table
+    task_dbt_run = BashOperator(
+        task_id='dbt_run_all',
+        bash_command="""
+        dbt debug --project-dir /opt/airflow/dbt --profiles-dir /opt/airflow/dbt && \
+        dbt build \
+            --project-dir /opt/airflow/dbt \
+            --profiles-dir /opt/airflow/dbt \
+            --target dev
+        """,
+        env={
+            **os.environ,
+            'DBT_PROFILES_DIR': '/opt/airflow/dbt',
+            'GOOGLE_APPLICATION_CREDENTIALS': '/opt/airflow/keys/keys.json'
+        }
+    )
+
+    task_extract >> task_load_to_bq >> task_dbt_run

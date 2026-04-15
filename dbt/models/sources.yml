@@ -1,0 +1,9 @@
+version: 2
+
+sources:
+  - name: polymarket_raw_data
+    database: "{{ env_var('TF_VAR_project_id') }}"
+    schema: polymarket_staging
+    tables:
+      - name: markets 
+        description: "Raw data for markets from PredScope"

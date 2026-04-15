@@ -1,0 +1,87 @@
+version: 2
+
+models:
+  # --- CAPA STAGING ---
+  - name: stg_polymarket_markets
+    description: "Capa de limpieza inicial con tipos de datos casteados. Contiene todo el historial bruto."
+    columns:
+      - name: market_slug
+        description: "ID del mercado. Puede repetirse en esta capa por las múltiples extracciones."
+        tests:
+          - not_null
+      - name: data_extracted_at
+        description: "Fecha y hora de extracción desde Airflow."
+        tests:
+          - not_null
+
+  # --- CAPA INTERMEDIATE ---
+  - name: int_polymarket_markets_dim
+    description: "Dimensión maestra de mercados. Solo una fila por slug (la más reciente)."
+    columns:
+      - name: market_slug
+        description: "Identificador único del mercado."
+        tests:
+          - unique
+          - not_null
+      - name: categories
+        description: "Array de strings con las categorías del mercado."
+
+  - name: int_polymarket_market_stats_fct
+    description: "Historial de métricas (volumen, liquidez) por mercado y fecha."
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - market_slug
+            - data_extracted_at
+    columns:
+      - name: market_slug
+        tests:
+          - not_null
+      - name: data_extracted_at
+        tests:
+          - not_null
+
+  - name: int_polymarket_outcomes_fct
+    description: "Historial de probabilidades desanidadas por cada opción de mercado."
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - market_slug
+            - outcome_title
+            - data_extracted_at
+    columns:
+      - name: market_slug
+        tests:
+          - not_null
+      - name: outcome_title
+        description: "Título de la opción (ej: Yes, No)."
+        tests:
+          - not_null
+      - name: data_extracted_at
+        tests:
+          - not_null
+      - name: probability
+        description: "Probabilidad calculada (float64)."
+
+  # --- CAPA MARTS (GOLD) ---
+  - name: fct_market_performance
+    description: "Tabla final optimizada para Dashboard. Une métricas y dimensiones."
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - market_slug
+            - outcome_title
+            - data_extracted_at
+    columns:
+      - name: market_slug
+        tests:
+          - not_null
+      - name: outcome_title
+        tests:
+          - not_null
+      - name: categories_list
+        description: "Categorías convertidas a texto plano para filtros de BI."
+      - name: data_extracted_at
+        description: "Timestamp para análisis de series temporales."
+        tests:
+          - not_null

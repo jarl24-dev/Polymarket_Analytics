@@ -16,15 +16,22 @@ services:
       - _AIRFLOW_WWW_USER_PASSWORD=airflow
       # GCP
       - GOOGLE_APPLICATION_CREDENTIALS=/opt/airflow/keys/keys.json
+      # DBT
+      - DBT_PROFILES_DIR=/opt/airflow/dbt
     volumes:
       - ./airflow/dags:/opt/airflow/dags
       - ./airflow/logs:/opt/airflow/logs
       - ./airflow/plugins:/opt/airflow/plugins
       - ./keys:/opt/airflow/keys:ro
+      - ./dbt:/opt/airflow/dbt
     ports:
       - "8080:8080"
+      - "8081:8081"
     command: >
-      bash -c "airflow db init &&
+      bash -c "
+      cd /opt/airflow/dbt && dbt deps && 
+      cd /opt/airflow &&
+      airflow db init &&
       airflow users create --username airflow --password airflow --firstname Admin --lastname User --role Admin --email admin@example.com || true &&
       airflow standalone"
     depends_on:

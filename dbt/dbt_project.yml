@@ -1,0 +1,38 @@
+name: 'polymarket_analytics'
+version: '1.0.0'
+config-version: 2
+
+# ESTO ES VITAL: Debe ser igual al nombre de la primera línea de tu profiles.yml
+profile: 'polymarket_profile' 
+
+# Define dónde buscará dbt cada cosa
+model-paths: ["models"]
+analysis-paths: ["analyses"]
+test-paths: ["tests"]
+seed-paths: ["seeds"]
+macro-paths: ["macros"]
+snapshot-paths: ["snapshots"]
+
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+# Aquí es donde va lo que ya escribiste
+models:
+  polymarket_analytics:
+    staging:
+      +schema: staging
+      +materialized: view
+
+    intermediate:
+      +schema: intermediate
+      +materialized: incremental
+      +incremental_strategy: 'merge'
+    
+      dimensions:
+        +materialized: table
+
+    marts:
+      +schema: marts
+      +materialized: incremental
+      +incremental_strategy: 'merge'

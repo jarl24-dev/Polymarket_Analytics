@@ -1,5 +1,14 @@
 FROM apache/airflow:2.10.2-python3.9
 
-COPY requirements.txt /requirements.txt
+USER root
 
-RUN pip install --no-cache-dir -r /requirements.txt
+RUN apt-get update && apt-get install -y git && apt-get clean
+
+USER airflow
+
+COPY requirements.txt /opt/airflow/requirements.txt
+
+RUN pip install --no-cache-dir -r /opt/airflow/requirements.txt
+
+ENV PATH="${PATH}:/home/airflow/.local/bin"
+

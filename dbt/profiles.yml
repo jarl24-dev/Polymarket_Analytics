@@ -1,0 +1,11 @@
+polymarket_profile: # El nombre que pusiste en dbt_project.yml
+  outputs:
+    dev:
+      type: bigquery
+      method: service-account
+      project: "{{ env_var('TF_VAR_project_id') }}"
+      dataset: polymarket
+      threads: 4
+      keyfile: /opt/airflow/keys/keys.json
+      location: "{{ env_var('TF_VAR_location') }}"
+  target: dev
