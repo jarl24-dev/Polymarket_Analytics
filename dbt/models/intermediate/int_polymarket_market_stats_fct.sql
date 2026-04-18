@@ -2,7 +2,13 @@
     config(
         materialized='incremental',
         unique_key=['market_slug', 'data_extracted_at'],
-        incremental_strategy='merge'
+        incremental_strategy='merge',
+        partition_by={
+            "field": "data_extracted_at",
+            "data_type": "timestamp",
+            "granularity": "day"
+        },
+        cluster_by=["market_slug"]
     ) 
 }}
 
