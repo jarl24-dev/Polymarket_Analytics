@@ -4,6 +4,8 @@ USER root
 
 RUN apt-get update && apt-get install -y git && apt-get clean
 
+RUN chmod -R 777 /opt/airflow/dbt /opt/airflow/keys 
+
 USER airflow
 
 COPY requirements.txt /opt/airflow/requirements.txt
